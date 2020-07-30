@@ -5782,6 +5782,7 @@ ngx_http_upstream_server(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
+    // 默认值
     weight = 1;
     max_conns = 0;
     max_fails = 1;
@@ -6387,6 +6388,7 @@ ngx_http_upstream_init_main_conf(ngx_conf_t *cf, void *conf)
 
     for (i = 0; i < umcf->upstreams.nelts; i++) {
 
+        // 默认使用加权轮训策略，如果有选择的策略，使用 uscfp[i]->peer.init_upstream 指针函数
         init = uscfp[i]->peer.init_upstream ? uscfp[i]->peer.init_upstream:
                                             ngx_http_upstream_init_round_robin;
 

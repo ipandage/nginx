@@ -26,7 +26,7 @@ static void ngx_http_upstream_empty_save_session(ngx_peer_connection_t *pc,
 
 #endif
 
-
+// 初始化轮询函数 ngx_http_upstream_init_round_robin 配置初始化
 ngx_int_t
 ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     ngx_http_upstream_srv_conf_t *us)
@@ -34,27 +34,29 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     ngx_url_t                      u;
     ngx_uint_t                     i, j, n, w;
     ngx_http_upstream_server_t    *server;
+    // 每一个后端服务器 用 ngx_http_upstream_rr_peer_t 结构体对应
     ngx_http_upstream_rr_peer_t   *peer, **peerp;
     ngx_http_upstream_rr_peers_t  *peers, *backup;
 
+    //设置初始化函数
     us->peer.init = ngx_http_upstream_init_round_robin_peer;
 
     if (us->servers) {
-        server = us->servers->elts;
+        server = us->servers->elts; //配置的upstream server数组
 
         n = 0;
         w = 0;
 
         for (i = 0; i < us->servers->nelts; i++) {
-            if (server[i].backup) {
+            if (server[i].backup) { //backup标记的server不会被加入到轮询中
                 continue;
             }
 
             n += server[i].naddrs;
-            w += server[i].naddrs * server[i].weight;
+            w += server[i].naddrs * server[i].weight; //统计权重和
         }
 
-        if (n == 0) {
+        if (n == 0) {  //发现upstream模块中没有配置server
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                           "no servers in upstream \"%V\" in %s:%ui",
                           &us->host, us->file_name, us->line);
@@ -81,11 +83,11 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
         peerp = &peers->peer;
 
         for (i = 0; i < us->servers->nelts; i++) {
-            if (server[i].backup) {
+            if (server[i].backup) { //backup标志的server不会被加入到轮询中
                 continue;
             }
 
-            for (j = 0; j < server[i].naddrs; j++) {
+            for (j = 0; j < server[i].naddrs; j++) { //初始化配置的upstream server的配置信息
                 peer[n].sockaddr = server[i].addrs[j].sockaddr;
                 peer[n].socklen = server[i].addrs[j].socklen;
                 peer[n].name = server[i].addrs[j].name;
@@ -104,10 +106,11 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
             }
         }
 
+        // 非后备服务器列表 挂载在 us->peer.data
         us->peer.data = peers;
 
         /* backup servers */
-
+        //重置 统计backup server的权重信息
         n = 0;
         w = 0;
 
@@ -188,6 +191,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     u.host = us->host;
     u.port = us->port;
 
+    //通过给定的url解析出主机IP信息
     if (ngx_inet_resolve_host(cf->pool, &u) != NGX_OK) {
         if (u.err) {
             ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
@@ -239,7 +243,7 @@ ngx_http_upstream_init_round_robin(ngx_conf_t *cf,
     return NGX_OK;
 }
 
-
+// 初始化轮询server
 ngx_int_t
 ngx_http_upstream_init_round_robin_peer(ngx_http_request_t *r,
     ngx_http_upstream_srv_conf_t *us)
@@ -268,6 +272,10 @@ ngx_http_upstream_init_round_robin_peer(ngx_http_request_t *r,
         n = rrp->peers->next->number;
     }
 
+    // sizeof(uintptr_t) = 8
+    // rrp->tried 位图 标识在一轮选择中，各个后端服务器是否被选择过
+    // 如果 后端服务器个数少于一个指针类型变量可以表示的范围 （32位系统32台，64位系统64台）
+    // 那么直接使用已有的指针类型的data变量做位图，否则使用 ngx_pcalloc() 函数申请对应的内存空间
     if (n <= 8 * sizeof(uintptr_t)) {
         rrp->tried = &rrp->data;
         rrp->data = 0;
@@ -281,6 +289,7 @@ ngx_http_upstream_init_round_robin_peer(ngx_http_request_t *r,
         }
     }
 
+    //初始化peer处理函数
     r->upstream->peer.get = ngx_http_upstream_get_round_robin_peer;
     r->upstream->peer.free = ngx_http_upstream_free_round_robin_peer;
     r->upstream->peer.tries = ngx_http_upstream_tries(rrp->peers);
@@ -294,7 +303,7 @@ ngx_http_upstream_init_round_robin_peer(ngx_http_request_t *r,
     return NGX_OK;
 }
 
-
+// 创建轮询peer
 ngx_int_t
 ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
     ngx_http_upstream_resolved_t *ur)
@@ -335,6 +344,7 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
     peers->name = &ur->host;
 
     if (ur->sockaddr) {
+        //只有一个upstream server
         peer[0].sockaddr = ur->sockaddr;
         peer[0].socklen = ur->socklen;
         peer[0].name = ur->name.data ? ur->name : ur->host;
@@ -347,6 +357,7 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
         peers->peer = peer;
 
     } else {
+        //设置组server状态信息
         peerp = &peers->peer;
 
         for (i = 0; i < ur->naddrs; i++) {
@@ -401,6 +412,7 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
         }
     }
 
+    //设置相关的回调函数
     r->upstream->peer.get = ngx_http_upstream_get_round_robin_peer;
     r->upstream->peer.free = ngx_http_upstream_free_round_robin_peer;
     r->upstream->peer.tries = ngx_http_upstream_tries(rrp->peers);
@@ -412,7 +424,7 @@ ngx_http_upstream_create_round_robin_peer(ngx_http_request_t *r,
     return NGX_OK;
 }
 
-
+// 选择后端服务器
 ngx_int_t
 ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
 {
@@ -435,7 +447,7 @@ ngx_http_upstream_get_round_robin_peer(ngx_peer_connection_t *pc, void *data)
     if (peers->single) {
         peer = peers->peer;
 
-        if (peer->down) {
+        if (peer->down) {  //只有一个server并且处于down状态
             goto failed;
         }
 
@@ -482,12 +494,12 @@ failed:
                 / (8 * sizeof(uintptr_t));
 
         for (i = 0; i < n; i++) {
-            rrp->tried[i] = 0;
+            rrp->tried[i] = 0; //重置尝试信息
         }
 
         ngx_http_upstream_rr_peers_unlock(peers);
 
-        rc = ngx_http_upstream_get_round_robin_peer(pc, rrp);
+        rc = ngx_http_upstream_get_round_robin_peer(pc, rrp); //获取轮询server的结果
 
         if (rc != NGX_BUSY) {
             return rc;
@@ -503,7 +515,7 @@ failed:
     return NGX_BUSY;
 }
 
-
+// 挑选出最合适的轮询server
 static ngx_http_upstream_rr_peer_t *
 ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
 {
@@ -529,14 +541,15 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
         n = i / (8 * sizeof(uintptr_t));
         m = (uintptr_t) 1 << i % (8 * sizeof(uintptr_t));
 
-        if (rrp->tried[n] & m) {
+        if (rrp->tried[n] & m) { // 尝试过的忽略
             continue;
         }
 
-        if (peer->down) {
+        if (peer->down) { // 标记为down的忽略
             continue;
         }
 
+        // 超过了最大fails次数 或者 fail设置的最大时间
         if (peer->max_fails
             && peer->fails >= peer->max_fails
             && now - peer->checked <= peer->fail_timeout)
@@ -544,17 +557,19 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
             continue;
         }
 
+        // 超过了server设置的最大值
         if (peer->max_conns && peer->conns >= peer->max_conns) {
             continue;
         }
 
-        peer->current_weight += peer->effective_weight;
+        peer->current_weight += peer->effective_weight; // 权重调整
         total += peer->effective_weight;
 
         if (peer->effective_weight < peer->weight) {
             peer->effective_weight++;
         }
 
+        // 挑选出权重最大的server
         if (best == NULL || peer->current_weight > best->current_weight) {
             best = peer;
             p = i;
@@ -570,10 +585,11 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
     n = p / (8 * sizeof(uintptr_t));
     m = (uintptr_t) 1 << p % (8 * sizeof(uintptr_t));
 
-    rrp->tried[n] |= m;
+    rrp->tried[n] |= m; // 保存upstream server的使用信息
 
-    best->current_weight -= total;
+    best->current_weight -= total; // 重置upstream当前权重
 
+    // 重置检查时间
     if (now - best->checked > best->fail_timeout) {
         best->checked = now;
     }
@@ -581,7 +597,7 @@ ngx_http_upstream_get_peer(ngx_http_upstream_rr_peer_data_t *rrp)
     return best;
 }
 
-
+// upstream 请求完成之后对upstream server中的数据进行释放
 void
 ngx_http_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
     ngx_uint_t state)
@@ -596,33 +612,33 @@ ngx_http_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
 
     /* TODO: NGX_PEER_KEEPALIVE */
 
-    peer = rrp->current;
+    peer = rrp->current;  //取得当前的upstream server
 
-    ngx_http_upstream_rr_peers_rlock(rrp->peers);
+    ngx_http_upstream_rr_peers_rlock(rrp->peers);  //读写锁对在nginx中的多进程请求进行同步
     ngx_http_upstream_rr_peer_lock(rrp->peers, peer);
 
-    if (rrp->peers->single) {
+    if (rrp->peers->single) { //只配置了一个server
 
-        peer->conns--;
+        peer->conns--;  //减少upstream server中对应server的连接数
 
         ngx_http_upstream_rr_peer_unlock(rrp->peers, peer);
         ngx_http_upstream_rr_peers_unlock(rrp->peers);
 
-        pc->tries = 0;
+        pc->tries = 0; //重置对上游server的连接尝试次数
         return;
     }
 
-    if (state & NGX_PEER_FAILED) {
+    if (state & NGX_PEER_FAILED) { //此状态表示找不到主机
         now = ngx_time();
 
-        peer->fails++;
-        peer->accessed = now;
-        peer->checked = now;
+        peer->fails++; //增加一次失败次数记录
+        peer->accessed = now; //设置访问此server的时间
+        peer->checked = now; //设置此server的检查时间
 
         if (peer->max_fails) {
-            peer->effective_weight -= peer->weight / peer->max_fails;
+            peer->effective_weight -= peer->weight / peer->max_fails; //降低此server的有效权重
 
-            if (peer->fails >= peer->max_fails) {
+            if (peer->fails >= peer->max_fails) { //达到了设置此server的最多失败次数 判定upstream server 不可用
                 ngx_log_error(NGX_LOG_WARN, pc->log, 0,
                               "upstream server temporarily disabled");
             }
@@ -632,7 +648,7 @@ ngx_http_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
                        "free rr peer failed: %p %i",
                        peer, peer->effective_weight);
 
-        if (peer->effective_weight < 0) {
+        if (peer->effective_weight < 0) { //调整 以防upstream server的有效权重小于0
             peer->effective_weight = 0;
         }
 
@@ -640,17 +656,17 @@ ngx_http_upstream_free_round_robin_peer(ngx_peer_connection_t *pc, void *data,
 
         /* mark peer live if check passed */
 
-        if (peer->accessed < peer->checked) {
+        if (peer->accessed < peer->checked) { //check通过 判定upstream server还是活动的
             peer->fails = 0;
         }
     }
 
-    peer->conns--;
+    peer->conns--; //减少peer server的连接数
 
     ngx_http_upstream_rr_peer_unlock(rrp->peers, peer);
     ngx_http_upstream_rr_peers_unlock(rrp->peers);
 
-    if (pc->tries) {
+    if (pc->tries) { //减少对上游服务器连接的尝试次数
         pc->tries--;
     }
 }

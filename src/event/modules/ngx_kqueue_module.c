@@ -42,6 +42,7 @@ static char *ngx_kqueue_init_conf(ngx_cycle_t *cycle, void *conf);
 int                    ngx_kqueue = -1;
 
 static struct kevent  *change_list;
+// 内核事件
 static struct kevent  *event_list;
 static ngx_uint_t      max_changes, nchanges, nevents;
 

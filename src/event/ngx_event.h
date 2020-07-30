@@ -64,6 +64,7 @@ struct ngx_event_s {
     unsigned         deferred_accept:1;
 
     /* the pending eof reported by kqueue, epoll or in aio chain operation */
+    // 标志位，为1表示等待字符流结束，它只与kqueue和aio事件驱动机制有关
     unsigned         pending_eof:1;
 
     unsigned         posted:1;
@@ -80,6 +81,7 @@ struct ngx_event_s {
     unsigned         kq_vnode:1;
 
     /* the pending errno reported by kqueue */
+    // kqueue报告的挂起错误号
     int              kq_errno;
 #endif
 

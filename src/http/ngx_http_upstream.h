@@ -93,7 +93,7 @@ typedef struct {
 typedef struct {
     ngx_str_t                        name;
     ngx_addr_t                      *addrs;
-    ngx_uint_t                       naddrs;
+    ngx_uint_t                       naddrs; // 数组元素个数
     ngx_uint_t                       weight;
     ngx_uint_t                       max_conns;
     ngx_uint_t                       max_fails;
