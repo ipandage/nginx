@@ -273,10 +273,13 @@ ngx_http_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
     /* create location trees */
-
+    // 所有的location 都以tree的形式组织起来
+    // 遍历 各个server的location tree 进行修剪
     for (s = 0; s < cmcf->servers.nelts; s++) {
 
         clcf = cscfp[s]->ctx->loc_conf[ngx_http_core_module.ctx_index];
+
+        //  ngx_http_init_locations ngx_http_init_static_location_trees 一次只处理一个节点
 
         if (ngx_http_init_locations(cf, cscfp[s], clcf) != NGX_OK) {
             return NGX_CONF_ERROR;
@@ -684,6 +687,7 @@ ngx_http_init_locations(ngx_conf_t *cf, ngx_http_core_srv_conf_t *cscf,
         return NGX_OK;
     }
 
+    // 对该节点上的location队列进行排序
     ngx_queue_sort(locations, ngx_http_cmp_locations);
 
     named = NULL;

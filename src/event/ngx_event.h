@@ -177,23 +177,32 @@ struct ngx_event_aio_s {
 
 
 typedef struct {
+    // 将某描述符的某个事件（可读/可写）添加到多路复用监控里
     ngx_int_t  (*add)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+    // 将某描述符的某个事件（可读/可写）从多路复用监控里删除
     ngx_int_t  (*del)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
+    // 启用对某个指定事件的监控
     ngx_int_t  (*enable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
+    // 禁用对某个指定事件的监控
     ngx_int_t  (*disable)(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags);
 
+    // 将指定连接关联的描述符加入到多路复用监控里
     ngx_int_t  (*add_conn)(ngx_connection_t *c);
+    // 将指定连接关联的描述符从多路复用监控里删除
     ngx_int_t  (*del_conn)(ngx_connection_t *c, ngx_uint_t flags);
 
     ngx_int_t  (*notify)(ngx_event_handler_pt handler);
 
+    // 阻塞等待事件发生，对发生的事件进行逐个处理
     ngx_int_t  (*process_events)(ngx_cycle_t *cycle, ngx_msec_t timer,
                                  ngx_uint_t flags);
 
+    // 初始化
     ngx_int_t  (*init)(ngx_cycle_t *cycle, ngx_msec_t timer);
+    // 回收资源
     void       (*done)(ngx_cycle_t *cycle);
-} ngx_event_actions_t;
+} ngx_event_actions_t; // I/O 多路复用模型被封装在这个结构里
 
 
 extern ngx_event_actions_t   ngx_event_actions;
@@ -409,7 +418,7 @@ extern ngx_uint_t            ngx_use_epoll_rdhup;
 #define NGX_CLEAR_EVENT    0    /* dummy declaration */
 #endif
 
-
+// 为了方便使用任何一种事件处理机制
 #define ngx_process_events   ngx_event_actions.process_events
 #define ngx_done_events      ngx_event_actions.done
 
